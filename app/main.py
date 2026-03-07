@@ -37,7 +37,7 @@ async def voice(request: Request):
         gather = Gather(
             input="speech",
             action="/voice",
-            speechTimeout="auto",
+            speechTimeout=3,
             timeout=8,
             language="en-IN",
             speechModel="phone_call"
@@ -97,7 +97,7 @@ async def voice(request: Request):
     gather = Gather(
         input="speech",
         action="/voice",
-        speechTimeout="auto",
+        speechTimeout=3,
         timeout=8,
         language="en-IN",
         speechModel="phone_call"
