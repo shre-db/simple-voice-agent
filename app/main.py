@@ -38,7 +38,8 @@ async def voice(request: Request):
             input="speech",
             action="/voice",
             speechTimeout="auto",
-            timeout=5,
+            timeout=8,
+            language="en-IN",
             speechModel="phone_call"
         )
 
@@ -97,7 +98,8 @@ async def voice(request: Request):
         input="speech",
         action="/voice",
         speechTimeout="auto",
-        timeout=5,
+        timeout=8,
+        language="en-IN",
         speechModel="phone_call"
     )
 
