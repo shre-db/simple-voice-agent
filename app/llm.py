@@ -1,16 +1,18 @@
 import os
-import google.generativeai as genai
-
 from dotenv import load_dotenv
+
+from google import genai
 
 load_dotenv()
 
-# Configure Gemini
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+client = genai.Client(
+    api_key=os.getenv("GOOGLE_API_KEY")
+)
 
-# Use fast model
-model = genai.GenerativeModel("gemini-1.5-flash")
+# print([model for model in client.models.list() if "gemini" in model.name])
+# exit()
 
+MODEL_NAME = "gemini-3.1-flash-lite-preview"
 
 SYSTEM_PROMPT = """
 You are a Wise customer support voice agent.
@@ -36,8 +38,9 @@ Caller question:
 Answer:
 """
 
-    response = model.generate_content(
-        SYSTEM_PROMPT + prompt
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=SYSTEM_PROMPT + prompt,
     )
 
     return response.text.strip()
