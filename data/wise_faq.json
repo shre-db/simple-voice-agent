@@ -1,0 +1,84 @@
+[
+  {
+    "id": "transfer_status",
+    "question": "How do I check my transfer’s status?",
+    "answer": "You can check your transfer status using the tracker in your Wise account. Go to Home, open your activity list, and click the transfer you want to track.",
+    "content": "The easiest way to check the status of your transfer is by using the tracker in your Wise account. Log in to your Wise account, go to Home to see your activity list, and click the transfer you want to track. The tracker shows stages like 'Your money's being processed', 'Money received', and 'Transfer sent', which indicate whether Wise is waiting for the money, converting it, or sending it to the recipient’s bank.",
+    "keywords": [
+      "check transfer status",
+      "track transfer",
+      "where is my money",
+      "transfer tracker",
+      "transfer status wise"
+    ],
+    "source_url": "https://wise.com/help/articles/2452305/how-do-i-check-my-transfers-status"
+  },
+  {
+    "id": "arrival_time",
+    "question": "When will my money arrive?",
+    "answer": "Wise gives you an estimated arrival time when you create a transfer. You can check the expected delivery in the transfer tracker in your Wise account.",
+    "content": "When you make a transfer, Wise provides an estimated delivery time. The easiest way to check is using the transfer tracker in your Wise account. Some banks may take a few hours to process incoming transfers. Delays can also happen if recipient details are incorrect, if the transfer happens during weekends or holidays, or if the bank needs additional processing time.",
+    "keywords": [
+      "when will money arrive",
+      "transfer delivery time",
+      "transfer timing",
+      "money arrival wise",
+      "how long transfer takes"
+    ],
+    "source_url": "https://wise.com/help/articles/2941900/when-will-my-money-arrive"
+  },
+  {
+    "id": "complete_not_arrived",
+    "question": "Why does it say my transfer's complete when the money hasn't arrived yet?",
+    "answer": "A transfer is marked complete when Wise sends the money to the recipient’s bank. The bank may still need up to one working day to process and release the funds.",
+    "content": "Wise marks a transfer as complete when the money has been sent to the recipient’s bank. Sometimes the bank may still take up to one working day to process and release the funds. In some cases, the recipient might not recognize the transfer because it appears under Wise or a banking partner's name, or the amount may look different if the bank converted the currency again.",
+    "keywords": [
+      "transfer complete but not received",
+      "money not arrived",
+      "transfer completed but missing",
+      "wise transfer complete"
+    ],
+    "source_url": "https://wise.com/help"
+  },
+  {
+    "id": "transfer_delay",
+    "question": "Why is my transfer taking longer than the estimate?",
+    "answer": "Transfers may take longer due to security checks, slower payment methods, bank processing times, weekends, or mistakes in the recipient’s details.",
+    "content": "Wise provides an estimated delivery time when you create a transfer. Delays can occur if the payment method takes longer, if security checks are required, if banks are closed on weekends or holidays, or if there are mistakes in the recipient's account details. The recipient’s bank may also take additional time to process incoming transfers.",
+    "keywords": [
+      "transfer delay",
+      "money taking long",
+      "transfer slower than expected",
+      "wise delay",
+      "why transfer late"
+    ],
+    "source_url": "https://wise.com/help"
+  },
+  {
+    "id": "proof_of_payment",
+    "question": "What is a proof of payment?",
+    "answer": "A proof of payment is a document showing that you sent money from your bank account, such as a bank statement PDF or a screenshot from your online banking.",
+    "content": "A proof of payment confirms that you sent money from your bank account. Wise may request it if the payment hasn't arrived yet or if they need to verify the payment came from an account in your name. The document should include your name, account number, the bank name, Wise account details, the amount, currency, date, and the payment reference.",
+    "keywords": [
+      "proof of payment",
+      "payment confirmation",
+      "transfer proof",
+      "bank statement proof",
+      "wise payment verification"
+    ],
+    "source_url": "https://wise.com/help"
+  },
+  {
+    "id": "partner_reference",
+    "question": "What's a banking partner reference number?",
+    "answer": "A banking partner reference number is an identifier used by Wise’s local banking partners to track your transfer once it has been sent to the recipient’s bank.",
+    "content": "For some transfers, Wise provides a banking partner reference number in addition to the Wise transfer number. This number helps the recipient’s bank locate the payment after the transfer has been completed. In some countries, this may be called a UTR or transaction reference number.",
+    "keywords": [
+      "banking partner reference",
+      "transfer reference number",
+      "UTR number",
+      "transaction reference wise"
+    ],
+    "source_url": "https://wise.com/help"
+  }
+]
