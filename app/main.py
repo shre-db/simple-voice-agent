@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
+from urllib.parse import parse_qs
 
 from twilio.twiml.voice_response import VoiceResponse, Gather
 
@@ -9,12 +10,24 @@ from app.llm import generate_answer
 app = FastAPI()
 
 
-@app.post("/voice")
+def extract_speech_result(body: bytes) -> str | None:
+    if not body:
+        return None
+
+    parsed = parse_qs(body.decode("utf-8"), keep_blank_values=True)
+    speech_values = parsed.get("SpeechResult")
+
+    return speech_values[0] if speech_values else None
+
+
+@app.api_route("/voice", methods=["GET", "POST"])
 async def voice(request: Request):
 
-    form = await request.form()
-
-    user_speech = form.get("SpeechResult")
+    if request.method == "POST":
+        body = await request.body()
+        user_speech = extract_speech_result(body)
+    else:
+        user_speech = request.query_params.get("SpeechResult")
 
     response = VoiceResponse()
 
@@ -25,7 +38,7 @@ async def voice(request: Request):
             input="speech",
             action="/voice",
             speechTimeout="auto",
-            timeout=1,
+            timeout=5,
             speechModel="phone_call"
         )
 
@@ -84,7 +97,7 @@ async def voice(request: Request):
         input="speech",
         action="/voice",
         speechTimeout="auto",
-        timeout=1,
+        timeout=5,
         speechModel="phone_call"
     )
 

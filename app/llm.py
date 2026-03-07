@@ -5,9 +5,8 @@ from google import genai
 
 load_dotenv()
 
-client = genai.Client(
-    api_key=os.getenv("GOOGLE_API_KEY")
-)
+api_key = os.getenv("GOOGLE_API_KEY")
+client = genai.Client(api_key=api_key) if api_key else None
 
 # print([model for model in client.models.list() if "gemini" in model.name])
 # exit()
@@ -27,6 +26,9 @@ Rules:
 
 
 def generate_answer(user_question: str, faq_context: str):
+    if client is None:
+        print("GOOGLE_API_KEY is not configured.")
+        return "HUMAN_ESCALATION"
 
     prompt = f"""
 Context:
@@ -38,9 +40,13 @@ Caller question:
 Answer:
 """
 
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=SYSTEM_PROMPT + prompt,
-    )
+    try:
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=SYSTEM_PROMPT + prompt,
+        )
+    except Exception as exc:
+        print(f"LLM generation failed: {exc}")
+        return "HUMAN_ESCALATION"
 
-    return response.text.strip()
+    return (response.text or "").strip() or "HUMAN_ESCALATION"
