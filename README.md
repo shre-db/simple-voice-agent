@@ -1,10 +1,21 @@
-# simple-voice-agent
+# Simple Voice Agent
+
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-%3E%3D0.135.1-009688)
+![Twilio](https://img.shields.io/badge/Twilio-%3E%3D9.10.2-F22F46)
+![Qdrant Client](https://img.shields.io/badge/Qdrant%20Client-%3E%3D1.17.0-EA4335)
+![Google GenAI](https://img.shields.io/badge/Google%20GenAI-%3E%3D1.66.0-4285F4)
+![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2-2496ED)
 
 A simple voice agent for incoming support calls.
 
 The agent:
-- Answers only Wise "Where is my money" FAQ-style questions from the local dataset.
+- Answers only [Wise](https://wise.com/help/topics/5bVKT0uQdBrDp6T62keyfz/sending-money) "Where is my money" FAQ-style questions from the local dataset.
 - Deflects unrelated questions to a human agent and ends the call.
+
+## Architecture
+
+- [System architecture and technical details](docs/architecture.md)
 
 ## Stack
 
@@ -95,7 +106,7 @@ ngrok http 8000
 2. Copy HTTPS forwarding URL from ngrok, for example:
    `https://abc123.ngrok-free.app`
 
-3. In Twilio Console:
+3. In Twilio Console (Twilio provides a free trial with a test number):
    - Go to Develop > # Phone Numbers > Manage > Active numbers > [Your Number] > Voice Configuration.
    - Under "A call comes in", choose `Webhook`.
    - Set URL to (example): `https://abc123.ngrok-free.app/voice`
@@ -146,3 +157,11 @@ Expected:
   - Confirm ngrok is running.
   - Confirm Twilio webhook is exactly `POST https://<ngrok-domain>/voice`.
   - Check app logs: `docker compose logs -f app`
+
+## License
+MIT License. See [LICENSE](LICENSE) file for details.
+
+## Author
+**Shreyas Bangera**
+- [GitHub](https://github.com/shre-db) 
+- shreyasdb99@gmail.com
