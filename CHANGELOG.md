@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.4] - 2026-03-08
+
+### Added
+- MIT `LICENSE` file.
+- Architecture documentation at `docs/architecture.md` with Mermaid diagrams for call flow and runtime/deployment topology.
+- README badges for key stack versions (Python, FastAPI, Twilio, Qdrant client, Google GenAI, Docker Compose).
+
+### Changed
+- README title and content polish for clarity.
+- README now links to the architecture document from a dedicated "Architecture" section.
+- README now includes an explicit Wise source link, Twilio trial note, and License/Author sections.
+- Mermaid diagram labels were refined for better readability and rendering in narrow layouts.
+
 ## [v0.0.3] - 2026-03-08
 
 ### Added
