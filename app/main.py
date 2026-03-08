@@ -21,10 +21,12 @@ def parse_positive_int(value: str, default: int) -> int:
 
 
 DEFAULT_GATHER_LANGUAGE = os.getenv("TWILIO_GATHER_LANGUAGE", "en-IN")
-DEFAULT_GATHER_SPEECH_MODEL = os.getenv("TWILIO_GATHER_SPEECH_MODEL", "phone_call")
+DEFAULT_GATHER_SPEECH_MODEL = os.getenv("TWILIO_GATHER_SPEECH_MODEL", "googlev2_telephony")
 DEFAULT_GATHER_TIMEOUT = parse_positive_int(os.getenv("TWILIO_GATHER_TIMEOUT", "8"), 8)
 DEFAULT_GATHER_SPEECH_TIMEOUT = os.getenv("TWILIO_GATHER_SPEECH_TIMEOUT", "3")
 DEFAULT_GATHER_HINTS = os.getenv("TWILIO_GATHER_HINTS", "").strip()
+DEFAULT_TTS_VOICE = os.getenv("TWILIO_TTS_VOICE", "Polly.Joanna-Neural").strip()
+DEFAULT_TTS_LANGUAGE = os.getenv("TWILIO_TTS_LANGUAGE", "").strip()
 
 
 def extract_speech_result(body: bytes) -> str | None:
@@ -44,6 +46,22 @@ def parse_speech_timeout(value: str) -> int:
     return parse_positive_int(value, 3)
 
 
+def say_with_config(target: Gather | VoiceResponse, text: str) -> None:
+    say_kwargs = {}
+    if DEFAULT_TTS_VOICE:
+        say_kwargs["voice"] = DEFAULT_TTS_VOICE
+    if DEFAULT_TTS_LANGUAGE:
+        say_kwargs["language"] = DEFAULT_TTS_LANGUAGE
+
+    print(
+        "[DEBUG][TTS] "
+        f"voice={say_kwargs.get('voice', 'default')} "
+        f"language={say_kwargs.get('language', 'default')}"
+    )
+
+    target.say(text, **say_kwargs)
+
+
 def build_gather(prompt: str) -> Gather:
     gather_kwargs = {
         "input": "speech",
@@ -54,14 +72,20 @@ def build_gather(prompt: str) -> Gather:
         "speechModel": DEFAULT_GATHER_SPEECH_MODEL,
     }
 
-    # Debugging logs
-    print(gather_kwargs["speechModel"])
-
     if DEFAULT_GATHER_HINTS:
         gather_kwargs["hints"] = DEFAULT_GATHER_HINTS
 
+    print(
+        "[DEBUG][STT] "
+        f"speechModel={gather_kwargs['speechModel']} "
+        f"language={gather_kwargs['language']} "
+        f"speechTimeout={gather_kwargs['speechTimeout']} "
+        f"timeout={gather_kwargs['timeout']} "
+        f"hints={'set' if 'hints' in gather_kwargs else 'none'}"
+    )
+
     gather = Gather(**gather_kwargs)
-    gather.say(prompt)
+    say_with_config(gather, prompt)
     return gather
 
 
@@ -98,7 +122,8 @@ async def voice(request: Request):
     # Escalation if no match
     if faq is None:
 
-        response.say(
+        say_with_config(
+            response,
             "I'm sorry, this question requires a human support agent. Please contact Wise support."
         )
 
@@ -118,7 +143,8 @@ async def voice(request: Request):
     # LLM escalation
     if "HUMAN_ESCALATION" in answer:
 
-        response.say(
+        say_with_config(
+            response,
             "I'm sorry, this question requires a human support agent. Please contact Wise support."
         )
 
