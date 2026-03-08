@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 from qdrant_client import QdrantClient
@@ -9,7 +10,9 @@ from fastembed import TextEmbedding
 COLLECTION_NAME = "wise_faq"
 
 # Connect to Qdrant
-client = QdrantClient(host="localhost", port=6333)
+qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
+client = QdrantClient(host=qdrant_host, port=qdrant_port)
 
 # Initialize embedding model
 embedding_model = TextEmbedding()
