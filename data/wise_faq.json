@@ -38,7 +38,7 @@
       "transfer completed but missing",
       "wise transfer complete"
     ],
-    "source_url": "https://wise.com/help"
+    "source_url": "https://wise.com/help/articles/2977950/why-does-it-say-my-transfers-complete-when-the-money-hasnt-arrived-yet?"
   },
   {
     "id": "transfer_delay",
@@ -52,7 +52,7 @@
       "wise delay",
       "why transfer late"
     ],
-    "source_url": "https://wise.com/help"
+    "source_url": "https://wise.com/help/articles/2977951/why-is-my-transfer-taking-longer-than-the-estimate?"
   },
   {
     "id": "proof_of_payment",
@@ -66,7 +66,7 @@
       "bank statement proof",
       "wise payment verification"
     ],
-    "source_url": "https://wise.com/help"
+    "source_url": "https://wise.com/help/articles/2932689/what-is-a-proof-of-payment?"
   },
   {
     "id": "partner_reference",
@@ -79,6 +79,6 @@
       "UTR number",
       "transaction reference wise"
     ],
-    "source_url": "https://wise.com/help"
+    "source_url": "https://wise.com/help/articles/2977938/whats-a-banking-partner-reference-number?"
   }
 ]
