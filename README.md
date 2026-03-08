@@ -40,6 +40,13 @@ Required for Twilio call flow setup/testing:
 - `USER_PHONE_NUMBER`
 
 Optional (defaults shown):
+- `TWILIO_GATHER_LANGUAGE=en-IN`
+- `TWILIO_GATHER_SPEECH_MODEL=googlev2_telephony`
+- `TWILIO_GATHER_SPEECH_TIMEOUT=3`
+- `TWILIO_GATHER_TIMEOUT=8`
+- `TWILIO_GATHER_HINTS=`
+- `TWILIO_TTS_VOICE=Polly.Joanna-Neural`
+- `TWILIO_TTS_LANGUAGE=`
 - `QDRANT_HOST=localhost`
 - `QDRANT_PORT=6333`
 
@@ -100,6 +107,28 @@ ngrok http 8000
 Important:
 - Free ngrok URLs change when ngrok restarts. Update Twilio webhook each time URL changes.
 - If app is in Docker and ngrok runs on host, `ngrok http 8000` is correct because Compose publishes `8000:8000`.
+
+## Google STT v2 Experiment Notes
+
+- `TWILIO_GATHER_SPEECH_MODEL` is now environment configurable.
+- Current `.env.example` uses `googlev2_telephony`.
+- Other common values you can try:
+  - `googlev2_telephony_short`
+  - `googlev2_short`
+  - `phone_call` (Twilio default style fallback)
+- After changing `.env`, restart app container:
+
+```bash
+docker compose up -d --build app
+```
+
+## Neural TTS Experiment Notes
+
+- `TWILIO_TTS_VOICE` controls the Twilio `<Say>` voice.
+- Current `.env.example` uses `Polly.Joanna-Neural`.
+- If a voice is unavailable for your account or locale, switch to another supported voice or set:
+  - `TWILIO_TTS_VOICE=` (empty value) to use Twilio default voice.
+- `TWILIO_TTS_LANGUAGE` is optional and usually can stay empty when voice already implies language.
 
 ## Verify Assignment Behavior
 
