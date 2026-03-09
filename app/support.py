@@ -24,6 +24,25 @@ class SupportResponse:
     faq_match: FAQMatch | None = None
 
 
+def _single_line(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _log_support_response(user_question: str, response: SupportResponse) -> None:
+    faq_id = response.faq_match.id if response.faq_match else None
+    faq_score = response.faq_match.score if response.faq_match else None
+    faq_source = response.faq_match.source_url if response.faq_match else None
+    print(
+        "[SUPPORT] "
+        f"question={_single_line(user_question)} | "
+        f"requires_human={response.requires_human} | "
+        f"faq_id={faq_id} | "
+        f"score={faq_score} | "
+        f"source={faq_source} | "
+        f"response={_single_line(response.text)}"
+    )
+
+
 def find_faq_match(user_question: str) -> FAQMatch | None:
     faq = query_faq(user_question)
     if faq is None:
@@ -42,21 +61,27 @@ def decide_support_response(user_question: str) -> SupportResponse:
     faq_match = find_faq_match(user_question)
 
     if faq_match is None:
-        return SupportResponse(
+        response = SupportResponse(
             text=HUMAN_ESCALATION_MESSAGE,
             requires_human=True,
         )
+        _log_support_response(user_question, response)
+        return response
 
     answer = generate_answer(user_question, faq_match.content)
     if "HUMAN_ESCALATION" in answer:
-        return SupportResponse(
+        response = SupportResponse(
             text=HUMAN_ESCALATION_MESSAGE,
             requires_human=True,
             faq_match=faq_match,
         )
+        _log_support_response(user_question, response)
+        return response
 
-    return SupportResponse(
+    response = SupportResponse(
         text=answer,
         requires_human=False,
         faq_match=faq_match,
     )
+    _log_support_response(user_question, response)
+    return response

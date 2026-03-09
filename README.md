@@ -61,12 +61,26 @@ Required for LiveKit backend:
 - `LIVEKIT_API_SECRET`
 
 Optional (defaults shown):
+- `AGENT_IDENTITY_NAME=Wise Support Assistant`
+- `AGENT_IDENTITY_ROLE=transfer tracking specialist`
+- `AGENT_COMPANY_NAME=Wise`
+- `AGENT_IDENTITY_TONE=calm, confident, and practical`
+- `GOOGLE_MODEL_NAME=gemini-3.1-flash-lite-preview`
+- `GOOGLE_MODEL_FALLBACK=gemini-2.5-flash`
+- `GOOGLE_MODEL_RETRY_COUNT=2`
+- `GOOGLE_MODEL_RETRY_BACKOFF_SECONDS=0.6`
 - `LIVEKIT_AGENT_NAME=wise-support-agent`
-- `LIVEKIT_LLM_MODEL=gemini-3.1-flash-lite-preview`
+- `LIVEKIT_ROOM_PREFIX=call-`
 - `LIVEKIT_STT_MODEL=deepgram/nova-2-phonecall`
 - `LIVEKIT_STT_LANGUAGE=en`
 - `LIVEKIT_TTS_MODEL=cartesia/sonic-3`
 - `LIVEKIT_TTS_VOICE=f786b574-daa5-4673-aa0c-cbe3e8534c02`
+- `LIVEKIT_ALLOW_INTERRUPTIONS=false`
+- `LIVEKIT_MIN_INTERRUPTION_DURATION=1.0`
+- `LIVEKIT_MIN_ENDPOINTING_DELAY=1.2`
+- `LIVEKIT_MAX_ENDPOINTING_DELAY=3.0`
+- `LIVEKIT_REPROMPT_ON_LOW_SIGNAL=true`
+- `LIVEKIT_CLARIFY_BEFORE_DEFLECTION=true`
 - `TWILIO_GATHER_LANGUAGE=en-IN`
 - `TWILIO_GATHER_SPEECH_MODEL=googlev2_telephony`
 - `TWILIO_GATHER_SPEECH_TIMEOUT=3`
@@ -76,6 +90,10 @@ Optional (defaults shown):
 - `TWILIO_TTS_LANGUAGE=`
 - `QDRANT_HOST=localhost`
 - `QDRANT_PORT=6333`
+
+Identity behavior:
+- Greeting and LLM answer style follow the identity variables above.
+- This applies consistently to both `twilio` and `livekit` backends.
 
 ## Backend Selection
 
@@ -112,8 +130,29 @@ This path is for `VOICE_BACKEND=twilio`.
 ./scripts/run_livekit_agent.sh
 ```
 
-4. In LiveKit Cloud, route your phone number to agent name `wise-support-agent`
-   (or value from `LIVEKIT_AGENT_NAME`).
+4. Create a SIP dispatch rule that routes calls to your agent:
+
+```bash
+./scripts/create_livekit_dispatch_rule.sh
+```
+
+5. In LiveKit Cloud, assign your phone number to that dispatch rule.
+
+Deflection behavior in LiveKit backend:
+- Out-of-scope questions are spoken with a human-agent deflection message.
+- Call then ends by deleting the active LiveKit room.
+
+LiveKit LLM note:
+- LiveKit backend reuses the same FAQ + Gemini answer path as Twilio backend for consistent behavior.
+- Configure Gemini key via `GOOGLE_API_KEY` (model is defined in `app/llm.py`).
+- If primary model returns transient errors (`503/429`), the app retries and falls back to `GOOGLE_MODEL_FALLBACK`.
+
+LiveKit telephony truncation note:
+- Agent replies are streamed and can be interrupted by caller speech/noise.
+- Defaults in `.env.example` now disable interruptions for call stability.
+- To re-enable barge-in later, set `LIVEKIT_ALLOW_INTERRUPTIONS=true` and tune interruption delays.
+- Greeting-only utterances (like "hey") are reprompted instead of immediate deflection.
+- Deflection now includes one clarification attempt before ending the call.
 
 ## Manual Docker Commands
 
@@ -199,6 +238,12 @@ Expected:
   - Confirm ngrok is running.
   - Confirm Twilio webhook is exactly `POST https://<ngrok-domain>/voice`.
   - Check app logs: `docker compose logs -f app`
+
+- LiveKit call is not reaching agent:
+  - Confirm `VOICE_BACKEND=livekit`.
+  - Confirm worker is running: `./scripts/run_livekit_agent.sh`
+  - Confirm dispatch rule exists: `lk sip dispatch list`
+  - Confirm phone number is attached to the dispatch rule in LiveKit Cloud.
 
 ## License
 MIT License. See [LICENSE](LICENSE) file for details.

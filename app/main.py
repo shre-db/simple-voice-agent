@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 
 from twilio.twiml.voice_response import VoiceResponse, Gather
 
+from app.agent_identity import build_voice_greeting
 from app.backend import get_voice_backend
 from app.support import decide_support_response
 
@@ -112,7 +113,7 @@ async def voice(request: Request):
     if not user_speech:
 
         gather = build_gather(
-            "Hello. You have reached Wise support. How can I help you today?"
+            build_voice_greeting()
         )
 
         response.append(gather)
