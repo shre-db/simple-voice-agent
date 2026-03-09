@@ -9,6 +9,7 @@ dependencies = [
     "fastembed>=0.7.4",
     "google-genai>=1.66.0",
     "httpx>=0.28.1",
+    "livekit-agents[google,silero]>=1.2.8",
     "python-dotenv>=1.2.2",
     "qdrant-client>=1.17.0",
     "twilio>=9.10.2",

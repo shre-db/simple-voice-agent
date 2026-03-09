@@ -6,8 +6,8 @@ from urllib.parse import parse_qs
 
 from twilio.twiml.voice_response import VoiceResponse, Gather
 
-from app.rag import query_faq
-from app.llm import generate_answer
+from app.backend import get_voice_backend
+from app.support import decide_support_response
 
 app = FastAPI()
 
@@ -27,6 +27,7 @@ DEFAULT_GATHER_SPEECH_TIMEOUT = os.getenv("TWILIO_GATHER_SPEECH_TIMEOUT", "3")
 DEFAULT_GATHER_HINTS = os.getenv("TWILIO_GATHER_HINTS", "").strip()
 DEFAULT_TTS_VOICE = os.getenv("TWILIO_TTS_VOICE", "Polly.Joanna-Neural").strip()
 DEFAULT_TTS_LANGUAGE = os.getenv("TWILIO_TTS_LANGUAGE", "").strip()
+VOICE_BACKEND = get_voice_backend()
 
 
 def extract_speech_result(body: bytes) -> str | None:
@@ -91,6 +92,13 @@ def build_gather(prompt: str) -> Gather:
 
 @app.api_route("/voice", methods=["GET", "POST"])
 async def voice(request: Request):
+    if VOICE_BACKEND != "twilio":
+        response = VoiceResponse()
+        response.say(
+            "Twilio voice webhook is disabled. This deployment is configured for LiveKit backend."
+        )
+        response.hangup()
+        return Response(content=str(response), media_type="application/xml")
 
     if request.method == "POST":
         body = await request.body()
@@ -116,47 +124,15 @@ async def voice(request: Request):
 
     print("User said:", user_speech)
 
-    # RAG retrieval
-    faq = query_faq(user_speech)
+    support_response = decide_support_response(user_speech)
 
-    # Escalation if no match
-    if faq is None:
-
-        say_with_config(
-            response,
-            "I'm sorry, this question requires a human support agent. Please contact Wise support."
-        )
-
+    if support_response.requires_human:
+        say_with_config(response, support_response.text)
         response.hangup()
-
-        return Response(
-            content=str(response),
-            media_type="application/xml"
-        )
-
-    # Generate answer with Gemini
-    answer = generate_answer(
-        user_speech,
-        faq["content"]
-    )
-
-    # LLM escalation
-    if "HUMAN_ESCALATION" in answer:
-
-        say_with_config(
-            response,
-            "I'm sorry, this question requires a human support agent. Please contact Wise support."
-        )
-
-        response.hangup()
-
-        return Response(
-            content=str(response),
-            media_type="application/xml"
-        )
+        return Response(content=str(response), media_type="application/xml")
 
     # Speak the answer
-    gather = build_gather(answer)
+    gather = build_gather(support_response.text)
 
     response.append(gather)
 

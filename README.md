@@ -3,6 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-%3E%3D0.135.1-009688)
 ![Twilio](https://img.shields.io/badge/Twilio-%3E%3D9.10.2-F22F46)
+![LiveKit Agents](https://img.shields.io/badge/LiveKit%20Agents-%3E%3D1.2.8-1A1A1A)
 ![Qdrant Client](https://img.shields.io/badge/Qdrant%20Client-%3E%3D1.17.0-EA4335)
 ![Google GenAI](https://img.shields.io/badge/Google%20GenAI-%3E%3D1.66.0-4285F4)
 ![Docker Compose](https://img.shields.io/badge/Docker%20Compose-v2-2496ED)
@@ -12,6 +13,7 @@ A simple voice agent for incoming support calls.
 The agent:
 - Answers only [Wise](https://wise.com/help/topics/5bVKT0uQdBrDp6T62keyfz/sending-money) "Where is my money" FAQ-style questions from the local dataset.
 - Deflects unrelated questions to a human agent and ends the call.
+- Supports two voice backends: `twilio` and `livekit` (selected by `VOICE_BACKEND`).
 
 ## Architecture
 
@@ -21,6 +23,7 @@ The agent:
 
 - FastAPI (voice webhook)
 - Twilio Voice (`<Gather>` for speech input, `<Say>` for speech output)
+- LiveKit Agents (real-time STT/LLM/TTS pipeline, LiveKit Cloud compatible)
 - Qdrant (vector store)
 - FastEmbed (embeddings)
 - Gemini API (final answer generation with escalation fallback)
@@ -31,6 +34,7 @@ The agent:
 - Docker Engine + Docker Compose v2
 - `ngrok` (for exposing local webhook to Twilio)
 - Twilio account + phone number
+- LiveKit Cloud project (for LiveKit backend)
 - Google API key for Gemini
 
 ## Environment
@@ -43,14 +47,26 @@ cp .env.example .env
 
 Required for app behavior:
 - `GOOGLE_API_KEY`
+- `VOICE_BACKEND` (`twilio` or `livekit`)
 
-Required for Twilio call flow setup/testing:
+Required for Twilio backend:
 - `TWILIO_ACCOUNT_SID`
 - `TWILIO_AUTH_TOKEN`
 - `TWILIO_PHONE_NUMBER`
 - `USER_PHONE_NUMBER`
 
+Required for LiveKit backend:
+- `LIVEKIT_URL`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
+
 Optional (defaults shown):
+- `LIVEKIT_AGENT_NAME=wise-support-agent`
+- `LIVEKIT_LLM_MODEL=gemini-3.1-flash-lite-preview`
+- `LIVEKIT_STT_MODEL=deepgram/nova-2-phonecall`
+- `LIVEKIT_STT_LANGUAGE=en`
+- `LIVEKIT_TTS_MODEL=cartesia/sonic-3`
+- `LIVEKIT_TTS_VOICE=f786b574-daa5-4673-aa0c-cbe3e8534c02`
 - `TWILIO_GATHER_LANGUAGE=en-IN`
 - `TWILIO_GATHER_SPEECH_MODEL=googlev2_telephony`
 - `TWILIO_GATHER_SPEECH_TIMEOUT=3`
@@ -60,6 +76,17 @@ Optional (defaults shown):
 - `TWILIO_TTS_LANGUAGE=`
 - `QDRANT_HOST=localhost`
 - `QDRANT_PORT=6333`
+
+## Backend Selection
+
+Set backend in `.env`:
+
+```bash
+VOICE_BACKEND=twilio   # or livekit
+```
+
+- `twilio`: run FastAPI webhook (`/voice`) and point Twilio phone number to it.
+- `livekit`: run LiveKit agent worker and assign a LiveKit phone number to the agent.
 
 ## Quick Start (Docker)
 Run the setup script:
@@ -72,6 +99,21 @@ What it does:
 2. Waits for Qdrant readiness
 3. Ingests FAQ data into Qdrant
 4. Starts the app on `http://localhost:8000`
+
+This path is for `VOICE_BACKEND=twilio`.
+
+## LiveKit Quick Start
+
+1. Set `VOICE_BACKEND=livekit` and add LiveKit Cloud credentials in `.env`.
+2. Ensure Qdrant has FAQ data (run `./scripts/setup.sh` once or ingest manually).
+3. Start LiveKit worker:
+
+```bash
+./scripts/run_livekit_agent.sh
+```
+
+4. In LiveKit Cloud, route your phone number to agent name `wise-support-agent`
+   (or value from `LIVEKIT_AGENT_NAME`).
 
 ## Manual Docker Commands
 
