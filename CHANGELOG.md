@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.5] - 2026-03-14
+
+### Added
+- LiveKit backend implementation with LiveKit Cloud worker flow (`VOICE_BACKEND=livekit`).
+- Unified OOP agent architecture:
+  - `app/base_agent.py`
+  - `app/twilio_agent.py`
+  - `app/livekit_agent.py`
+  - `app/mixins.py`
+  - `app/utils.py`
+- Shared backend entrypoint in `app/main.py` with environment-based backend switching.
+- LiveKit dispatch helper script `scripts/create_livekit_dispatch_rule.sh` aligned to current dispatch schema.
+- Local boot-time backend logs for clearer startup/debug visibility.
+
+### Changed
+- Refactored app structure to keep core modules focused:
+  - `main.py` (entrypoint/backend switch)
+  - `rag.py` (retrieval)
+  - `llm.py` (prompt/model/retry/fallback behavior)
+  - backend-specific agent classes.
+- README quick-start now clearly separates Twilio and LiveKit run flows and recommends:
+  - `uv run python -m app.main dev` for local LiveKit development.
+- LiveKit runner script now routes through unified entrypoint (`app.main`).
+- Agent prompt/identity instructions were improved for more consistent voice-agent behavior.
+
+### Fixed
+- LiveKit worker startup compatibility across async/sync `server.run(...)` behavior.
+- LiveKit process-spawn pickling issue by moving runtime callbacks to module scope.
+- Startup reliability by avoiding heavy RAG initialization at import time (lazy initialization in `rag.py`).
+- Call-flow robustness for LiveKit deflection and reply handling in the refactored backend.
+
 ## [v0.0.4] - 2026-03-08
 
 ### Added
