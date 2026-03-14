@@ -19,6 +19,17 @@ The agent:
 
 - [System architecture and technical details](docs/architecture.md)
 
+## App Layout
+
+- `app/main.py` - shared entrypoint; switches backend using `VOICE_BACKEND`
+- `app/rag.py` - FAQ retrieval from Qdrant/FastEmbed
+- `app/llm.py` - Gemini setup, system prompt, retry/fallback handling
+- `app/base_agent.py` - abstract base class and shared support decision flow
+- `app/mixins.py` - identity and logging mixins
+- `app/twilio_agent.py` - Twilio implementation (webhook/TwiML flow)
+- `app/livekit_agent.py` - LiveKit implementation (worker/session flow)
+- `app/utils.py` - shared helpers/utilities for both backends
+
 ## Stack
 
 - FastAPI (voice webhook)
@@ -105,6 +116,10 @@ VOICE_BACKEND=twilio   # or livekit
 
 - `twilio`: run FastAPI webhook (`/voice`) and point Twilio phone number to it.
 - `livekit`: run LiveKit agent worker and assign a LiveKit phone number to the agent.
+
+Single entrypoint:
+- `uv run python -m app.main` starts Twilio webhook mode when `VOICE_BACKEND=twilio`.
+- `uv run python -m app.main dev` starts LiveKit worker mode when `VOICE_BACKEND=livekit`.
 
 ## Quick Start (Docker)
 Run the setup script:

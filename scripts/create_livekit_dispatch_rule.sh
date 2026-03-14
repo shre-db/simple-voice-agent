@@ -6,9 +6,9 @@ if ! command -v lk >/dev/null 2>&1; then
   exit 1
 fi
 
-AGENT_NAME="${LIVEKIT_AGENT_NAME:-wise-support-agent-2}"
+AGENT_NAME="${LIVEKIT_AGENT_NAME:-wise-support-agent}"
 ROOM_PREFIX="${LIVEKIT_ROOM_PREFIX:-call-}"
-DISPATCH_NAME="${LIVEKIT_DISPATCH_NAME:-wise-support-dispatch-2}"
+DISPATCH_NAME="${LIVEKIT_DISPATCH_NAME:-wise-support-dispatch}"
 DISPATCH_METADATA="${LIVEKIT_DISPATCH_METADATA:-job dispatch metadata}"
 LIVEKIT_INBOUND_NUMBER_1="${LIVEKIT_INBOUND_NUMBER_PRIMARY:-"+14843985037"}"
 

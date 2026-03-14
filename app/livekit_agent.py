@@ -1,23 +1,17 @@
-import os
-import inspect
-import asyncio
-import re
+from __future__ import annotations
 
-from dotenv import load_dotenv
+from typing import TYPE_CHECKING, Any, TypeAlias
 
-from app.agent_identity import (
-    AGENT_COMPANY_NAME,
-    AGENT_IDENTITY_NAME,
-    AGENT_IDENTITY_ROLE,
-    AGENT_IDENTITY_TONE,
-    build_voice_greeting,
+from app.base_agent import BaseVoiceAgent
+from app.utils import (
+    extract_livekit_message_text,
+    get_env_optional,
+    get_env_str,
+    is_low_signal_input,
+    parse_bool,
+    parse_float,
+    say_and_wait,
 )
-from app.support import (
-    HUMAN_ESCALATION_MESSAGE,
-    decide_support_response,
-)
-
-load_dotenv()
 
 try:
     from livekit import api
@@ -25,148 +19,179 @@ try:
         Agent,
         AgentServer,
         AgentSession,
-        ChatMessage,
-        JobContext,
-        JobProcess,
         RoomOutputOptions,
         StopResponse,
+        cli,
         get_job_context,
         inference,
-        cli,
     )
     from livekit.plugins import silero
-except ImportError as exc:
-    raise RuntimeError(
-        "LiveKit dependencies are not installed. Install livekit-agents with required plugins."
-    ) from exc
+except ImportError:
+    api = None  # type: ignore[assignment]
+    Agent = object  # type: ignore[assignment,misc]
+    AgentServer = object  # type: ignore[assignment,misc]
+    AgentSession = object  # type: ignore[assignment,misc]
+    RoomOutputOptions = object  # type: ignore[assignment,misc]
+    StopResponse = RuntimeError  # type: ignore[assignment,misc]
+    cli = None  # type: ignore[assignment]
+    get_job_context = None  # type: ignore[assignment]
+    inference = None  # type: ignore[assignment]
+    silero = None  # type: ignore[assignment]
+
+if TYPE_CHECKING:
+    from livekit.agents import ChatMessage as LiveKitChatMessage
+    from livekit.agents import JobContext as LiveKitJobContext
+    from livekit.agents import JobProcess as LiveKitJobProcess
+else:
+    LiveKitChatMessage = Any
+    LiveKitJobContext = Any
+    LiveKitJobProcess = Any
+
+ChatMessageT: TypeAlias = LiveKitChatMessage
+JobContextT: TypeAlias = LiveKitJobContext
+JobProcessT: TypeAlias = LiveKitJobProcess
 
 
-LIVEKIT_AGENT_NAME = os.getenv("LIVEKIT_AGENT_NAME", "wise-support-agent").strip()
-LIVEKIT_STT_MODEL = os.getenv("LIVEKIT_STT_MODEL", "deepgram/nova-2-phonecall").strip()
-LIVEKIT_STT_LANGUAGE = os.getenv("LIVEKIT_STT_LANGUAGE", "en").strip()
-LIVEKIT_TTS_MODEL = os.getenv("LIVEKIT_TTS_MODEL", "cartesia/sonic-3").strip()
-LIVEKIT_TTS_VOICE = os.getenv(
-    "LIVEKIT_TTS_VOICE",
-    "f786b574-daa5-4673-aa0c-cbe3e8534c02",
-).strip()
-LIVEKIT_ALLOW_INTERRUPTIONS = os.getenv("LIVEKIT_ALLOW_INTERRUPTIONS", "false").strip()
-LIVEKIT_MIN_INTERRUPTION_DURATION = os.getenv("LIVEKIT_MIN_INTERRUPTION_DURATION", "1.0").strip()
-LIVEKIT_MIN_ENDPOINTING_DELAY = os.getenv("LIVEKIT_MIN_ENDPOINTING_DELAY", "1.2").strip()
-LIVEKIT_MAX_ENDPOINTING_DELAY = os.getenv("LIVEKIT_MAX_ENDPOINTING_DELAY", "3.0").strip()
-LIVEKIT_REPROMPT_ON_LOW_SIGNAL = os.getenv("LIVEKIT_REPROMPT_ON_LOW_SIGNAL", "true").strip()
-LIVEKIT_CLARIFY_BEFORE_DEFLECTION = os.getenv("LIVEKIT_CLARIFY_BEFORE_DEFLECTION", "true").strip()
-
-LOW_SIGNAL_WORDS = {
-    "hey",
-    "hi",
-    "hello",
-    "yo",
-    "um",
-    "uh",
-    "hmm",
-    "huh",
-    "okay",
-    "ok",
-}
-
-
-def parse_bool(value: str, default: bool) -> bool:
-    normalized = value.strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    return default
-
-
-def parse_float(value: str, default: float) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _extract_message_text(message: ChatMessage) -> str:
-    text_content = getattr(message, "text_content", "")
-    if callable(text_content):
-        return (text_content() or "").strip()
-    return (text_content or "").strip()
-
-
-def is_low_signal_input(user_text: str) -> bool:
-    words = re.findall(r"[a-zA-Z']+", user_text.lower())
-    if not words:
-        return True
-
-    meaningful = [word for word in words if word not in LOW_SIGNAL_WORDS]
-    return len(meaningful) == 0
-
-
-async def _say_and_wait(session: AgentSession, text: str) -> None:
-    say_result = session.say(text)
-    speech_handle = await say_result if inspect.isawaitable(say_result) else say_result
-
-    wait_for_playout = getattr(speech_handle, "wait_for_playout", None)
-    if callable(wait_for_playout):
-        wait_result = wait_for_playout()
-        if inspect.isawaitable(wait_result):
-            await wait_result
-        return
-
-    # Fallback for future API variations when no speech handle is exposed.
-    await asyncio.sleep(0.75)
-
-
-async def hangup_call() -> None:
-    ctx = get_job_context()
-    if ctx is None:
-        return
-
-    await ctx.api.room.delete_room(
-        api.DeleteRoomRequest(room=ctx.room.name)
-    )
-
-
-class WiseSupportLiveKitAgent(Agent):
-    def __init__(self) -> None:
-        super().__init__(
-            instructions=(
-                f"You are {AGENT_IDENTITY_NAME}, a {AGENT_IDENTITY_ROLE} at {AGENT_COMPANY_NAME}. "
-                f"Your tone is {AGENT_IDENTITY_TONE}. "
-                "Give concise but complete phone-call answers, and use as much detail as needed. "
-                "Speak in first person as the support representative. "
-                "Only answer from the verified FAQ context inserted in the conversation. "
-                "If context is missing or irrelevant, respond exactly with: "
-                f"{HUMAN_ESCALATION_MESSAGE}"
-            ),
+def _require_livekit_dependencies() -> None:
+    if api is None or cli is None or inference is None or silero is None:
+        raise RuntimeError(
+            "LiveKit dependencies are not installed. "
+            "Install livekit-agents with required plugins."
         )
+
+
+class LiveKitVoiceAgent(BaseVoiceAgent):
+    @property
+    def backend_name(self) -> str:
+        return "livekit"
+
+    @property
+    def agent_name(self) -> str:
+        return get_env_str("LIVEKIT_AGENT_NAME", "wise-support-agent")
+
+    @property
+    def stt_model(self) -> str:
+        return get_env_str("LIVEKIT_STT_MODEL", "deepgram/nova-2-phonecall")
+
+    @property
+    def stt_language(self) -> str:
+        return get_env_str("LIVEKIT_STT_LANGUAGE", "en")
+
+    @property
+    def tts_model(self) -> str:
+        return get_env_str("LIVEKIT_TTS_MODEL", "cartesia/sonic-3")
+
+    @property
+    def tts_voice(self) -> str:
+        return get_env_optional("LIVEKIT_TTS_VOICE", "f786b574-daa5-4673-aa0c-cbe3e8534c02")
+
+    @property
+    def allow_interruptions(self) -> bool:
+        return parse_bool(get_env_str("LIVEKIT_ALLOW_INTERRUPTIONS", "false"), False)
+
+    @property
+    def min_interruption_duration(self) -> float:
+        return parse_float(get_env_str("LIVEKIT_MIN_INTERRUPTION_DURATION", "1.0"), 1.0)
+
+    @property
+    def min_endpointing_delay(self) -> float:
+        return parse_float(get_env_str("LIVEKIT_MIN_ENDPOINTING_DELAY", "1.2"), 1.2)
+
+    @property
+    def max_endpointing_delay(self) -> float:
+        return parse_float(get_env_str("LIVEKIT_MAX_ENDPOINTING_DELAY", "3.0"), 3.0)
+
+    @property
+    def reprompt_on_low_signal(self) -> bool:
+        return parse_bool(get_env_str("LIVEKIT_REPROMPT_ON_LOW_SIGNAL", "true"), True)
+
+    @property
+    def clarify_before_deflection(self) -> bool:
+        return parse_bool(get_env_str("LIVEKIT_CLARIFY_BEFORE_DEFLECTION", "true"), True)
+
+    def runtime_instructions(self) -> str:
+        return (
+            f"You are {self.identity_name}, a {self.identity_role} at {self.company_name}. "
+            f"Your tone is {self.identity_tone}. "
+            "Give concise but complete phone-call answers, and use as much detail as needed. "
+            "Speak in first person as the support representative. "
+            "Only answer from the verified FAQ context inserted in the conversation. "
+            f"If context is missing or irrelevant, respond exactly with: {self.human_escalation_message}"
+        )
+
+    async def hangup_call(self) -> None:
+        if get_job_context is None:
+            return
+        ctx = get_job_context()
+        if ctx is None:
+            return
+        await ctx.api.room.delete_room(api.DeleteRoomRequest(room=ctx.room.name))
+
+    def build_tts(self):
+        if self.tts_voice:
+            return inference.TTS(model=self.tts_model, voice=self.tts_voice)
+        return inference.TTS(model=self.tts_model)
+
+    def prewarm(self, proc: JobProcessT) -> None:
+        proc.userdata["vad"] = silero.VAD.load()
+
+    def build_server(self):
+        _require_livekit_dependencies()
+        agent_owner = self
+        server = AgentServer(setup_fnc=self.prewarm)
+
+        @server.rtc_session(agent_name=self.agent_name)
+        async def entrypoint(ctx: JobContextT):
+            await ctx.connect()
+            session = AgentSession(
+                stt=inference.STT(model=agent_owner.stt_model, language=agent_owner.stt_language),
+                tts=agent_owner.build_tts(),
+                vad=ctx.proc.userdata["vad"],
+                allow_interruptions=agent_owner.allow_interruptions,
+                min_interruption_duration=agent_owner.min_interruption_duration,
+                min_endpointing_delay=agent_owner.min_endpointing_delay,
+                max_endpointing_delay=agent_owner.max_endpointing_delay,
+            )
+
+            await session.start(
+                room=ctx.room,
+                agent=_LiveKitRuntimeAgent(agent_owner),
+                room_output_options=RoomOutputOptions(
+                    transcription_enabled=False,
+                    sync_transcription=False,
+                ),
+            )
+
+        return server
+
+    def run_cli(self) -> None:
+        _require_livekit_dependencies()
+        cli.run_app(self.build_server())
+
+
+class _LiveKitRuntimeAgent(Agent):
+    def __init__(self, owner: LiveKitVoiceAgent) -> None:
+        super().__init__(instructions=owner.runtime_instructions())
+        self.owner = owner
         self.clarification_prompted = False
 
     async def on_enter(self) -> None:
         self.clarification_prompted = False
-        await _say_and_wait(
-            self.session,
-            build_voice_greeting(),
-        )
+        await say_and_wait(self.session, self.owner.greeting_message())
 
-    async def on_user_turn_completed(
-        self,
-        _turn_ctx,
-        new_message: ChatMessage,
-    ) -> None:
-        user_text = _extract_message_text(new_message)
+    async def on_user_turn_completed(self, _turn_ctx: Any, new_message: ChatMessageT) -> None:
+        user_text = extract_livekit_message_text(new_message)
         if not user_text:
             return
 
-        if parse_bool(LIVEKIT_REPROMPT_ON_LOW_SIGNAL, True) and is_low_signal_input(user_text):
-            await _say_and_wait(
+        if self.owner.reprompt_on_low_signal and is_low_signal_input(user_text):
+            await say_and_wait(
                 self.session,
                 "I can help with transfer status questions. Please tell me your transfer question.",
             )
             return
 
-        support_response = decide_support_response(user_text)
-
+        support_response = self.owner.decide_support_response(user_text)
         if support_response.faq_match is None:
             print("[LIVEKIT][RAG] no matching faq found")
         else:
@@ -177,65 +202,26 @@ class WiseSupportLiveKitAgent(Agent):
             )
 
         if support_response.requires_human:
-            if parse_bool(LIVEKIT_CLARIFY_BEFORE_DEFLECTION, True) and not self.clarification_prompted:
+            if self.owner.clarify_before_deflection and not self.clarification_prompted:
                 self.clarification_prompted = True
-                await _say_and_wait(
+                await say_and_wait(
                     self.session,
                     "I can help with transfer tracking questions like where your money is. "
                     "Could you ask your transfer question again?",
                 )
                 return
 
-            await _say_and_wait(self.session, support_response.text)
-            await hangup_call()
+            await say_and_wait(self.session, support_response.text)
+            await self.owner.hangup_call()
             raise StopResponse()
 
         self.clarification_prompted = False
-        await _say_and_wait(self.session, support_response.text)
-        return
+        await say_and_wait(self.session, support_response.text)
 
 
-def prewarm(proc: JobProcess) -> None:
-    proc.userdata["vad"] = silero.VAD.load()
-
-
-def build_tts_model():
-    if LIVEKIT_TTS_VOICE:
-        return inference.TTS(model=LIVEKIT_TTS_MODEL, voice=LIVEKIT_TTS_VOICE)
-    return inference.TTS(model=LIVEKIT_TTS_MODEL)
-
-
-server = AgentServer(setup_fnc=prewarm)
-
-
-@server.rtc_session(agent_name=LIVEKIT_AGENT_NAME)
-async def entrypoint(ctx: JobContext):
-    await ctx.connect()
-
-    allow_interruptions = parse_bool(LIVEKIT_ALLOW_INTERRUPTIONS, False)
-    min_interruption_duration = parse_float(LIVEKIT_MIN_INTERRUPTION_DURATION, 1.0)
-    min_endpointing_delay = parse_float(LIVEKIT_MIN_ENDPOINTING_DELAY, 1.2)
-    max_endpointing_delay = parse_float(LIVEKIT_MAX_ENDPOINTING_DELAY, 3.0)
-
-    session = AgentSession(
-        stt=inference.STT(model=LIVEKIT_STT_MODEL, language=LIVEKIT_STT_LANGUAGE),
-        tts=build_tts_model(),
-        vad=ctx.proc.userdata["vad"],
-        allow_interruptions=allow_interruptions,
-        min_interruption_duration=min_interruption_duration,
-        min_endpointing_delay=min_endpointing_delay,
-        max_endpointing_delay=max_endpointing_delay,
-    )
-
-    await session.start(
-        room=ctx.room,
-        agent=WiseSupportLiveKitAgent(),
-        room_output_options=RoomOutputOptions(
-            transcription_enabled=False,
-            sync_transcription=False,
-        ),
-    )
+def run_livekit_cli() -> None:
+    LiveKitVoiceAgent().run_cli()
 
 
 if __name__ == "__main__":
-    cli.run_app(server)
+    run_livekit_cli()

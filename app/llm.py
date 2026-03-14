@@ -1,32 +1,27 @@
-import os
 import time
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from google import genai
 
-from app.agent_identity import (
-    AGENT_COMPANY_NAME,
-    AGENT_IDENTITY_NAME,
-    AGENT_IDENTITY_ROLE,
-    AGENT_IDENTITY_TONE,
-)
+from app.utils import get_env_str, parse_float, parse_positive_int
 
 load_dotenv()
 
-api_key = os.getenv("GOOGLE_API_KEY")
-client = genai.Client(api_key=api_key) if api_key else None
-
-PRIMARY_MODEL_NAME = os.getenv(
-    "GOOGLE_MODEL_NAME",
-    "gemini-3.1-flash-lite-preview",
-).strip()
-FALLBACK_MODEL_NAME = os.getenv(
-    "GOOGLE_MODEL_FALLBACK",
-    "gemini-2.5-flash",
-).strip()
-MODEL_RETRY_COUNT = int(os.getenv("GOOGLE_MODEL_RETRY_COUNT", "2"))
-MODEL_RETRY_BACKOFF_SECONDS = float(os.getenv("GOOGLE_MODEL_RETRY_BACKOFF_SECONDS", "0.6"))
 HUMAN_ESCALATION_TOKEN = "HUMAN_ESCALATION"
+
+GOOGLE_API_KEY = get_env_str("GOOGLE_API_KEY", "")
+PRIMARY_MODEL_NAME = get_env_str("GOOGLE_MODEL_NAME", "gemini-3.1-flash-lite-preview")
+FALLBACK_MODEL_NAME = get_env_str("GOOGLE_MODEL_FALLBACK", "gemini-2.5-flash")
+MODEL_RETRY_COUNT = parse_positive_int(get_env_str("GOOGLE_MODEL_RETRY_COUNT", "2"), 2)
+MODEL_RETRY_BACKOFF_SECONDS = parse_float(
+    get_env_str("GOOGLE_MODEL_RETRY_BACKOFF_SECONDS", "0.6"),
+    0.6,
+)
+
+AGENT_IDENTITY_NAME = get_env_str("AGENT_IDENTITY_NAME", "Wise Support Assistant")
+AGENT_IDENTITY_ROLE = get_env_str("AGENT_IDENTITY_ROLE", "transfer tracking specialist")
+AGENT_COMPANY_NAME = get_env_str("AGENT_COMPANY_NAME", "Wise")
+AGENT_IDENTITY_TONE = get_env_str("AGENT_IDENTITY_TONE", "calm, confident, and practical")
 
 SYSTEM_PROMPT = """
 You are handling a live customer support call.
@@ -52,9 +47,11 @@ Rules:
 """.format(
     agent_name=AGENT_IDENTITY_NAME,
     agent_role=AGENT_IDENTITY_ROLE,
-    agent_tone=AGENT_IDENTITY_TONE,
     company=AGENT_COMPANY_NAME,
+    agent_tone=AGENT_IDENTITY_TONE,
 )
+
+client = genai.Client(api_key=GOOGLE_API_KEY) if GOOGLE_API_KEY else None
 
 
 def is_retryable_llm_error(exc: Exception) -> bool:
@@ -72,7 +69,7 @@ def is_retryable_llm_error(exc: Exception) -> bool:
 
 
 def selected_models() -> list[str]:
-    models = []
+    models: list[str] = []
     for model_name in (PRIMARY_MODEL_NAME, FALLBACK_MODEL_NAME):
         if model_name and model_name not in models:
             models.append(model_name)
@@ -108,15 +105,9 @@ Answer:
                 )
                 answer = (response.text or "").strip()
                 if answer:
-                    print(
-                        "[LLM] "
-                        f"model={model_name} "
-                        f"answer={answer}"
-                    )
+                    print(f"[LLM] model={model_name} answer={answer}")
                     return answer
-                print(
-                    f"LLM returned empty response: model={model_name}, attempt={attempt}"
-                )
+                print(f"LLM returned empty response: model={model_name}, attempt={attempt}")
             except Exception as exc:
                 retryable = is_retryable_llm_error(exc)
                 print(
