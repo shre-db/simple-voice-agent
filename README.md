@@ -82,6 +82,7 @@ Optional (defaults shown):
 - `GOOGLE_MODEL_RETRY_BACKOFF_SECONDS=0.6`
 - `LIVEKIT_AGENT_NAME=wise-support-agent`
 - `LIVEKIT_ROOM_PREFIX=call-`
+- `LIVEKIT_DEVMODE=true`
 - `LIVEKIT_STT_MODEL=deepgram/nova-2-phonecall`
 - `LIVEKIT_STT_LANGUAGE=en`
 - `LIVEKIT_TTS_MODEL=cartesia/sonic-3`
@@ -119,9 +120,9 @@ VOICE_BACKEND=twilio   # or livekit
 
 Single entrypoint:
 - `uv run python -m app.main` starts Twilio webhook mode when `VOICE_BACKEND=twilio`.
-- `uv run python -m app.main` starts LiveKit worker mode when `VOICE_BACKEND=livekit`.
-- `uv run python -m app.main dev` keeps LiveKit CLI dev mode (hot reload/watcher behavior).
-- Optional: set `LIVEKIT_DEVMODE=true` to run LiveKit default mode with `devmode` when no CLI subcommand is passed.
+- `uv run python -m app.main dev` is the recommended local command for LiveKit (`VOICE_BACKEND=livekit`) because it provides worker/watch logs.
+- `uv run python -m app.main` starts LiveKit worker mode in quieter non-CLI mode when `VOICE_BACKEND=livekit`.
+- Optional: set `LIVEKIT_DEVMODE=false` to run quieter LiveKit production mode when no CLI subcommand is passed.
 
 ## Quick Start (Docker)
 Run the setup script:
@@ -145,6 +146,7 @@ This path is for `VOICE_BACKEND=twilio`.
 
 ```bash
 ./scripts/run_livekit_agent.sh
+# equivalent: uv run python -m app.main dev
 ```
 
 4. Create a SIP dispatch rule that routes calls to your agent:
