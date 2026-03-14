@@ -1,166 +1,69 @@
 import os
+import sys
 
+import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import Response
-from urllib.parse import parse_qs
+from fastapi.responses import JSONResponse
 
-from twilio.twiml.voice_response import VoiceResponse, Gather
+from app.twilio_agent import TwilioVoiceAgent
+from app.utils import get_env_str, get_voice_backend, parse_bool, parse_positive_int
 
-from app.rag import query_faq
-from app.llm import generate_answer
-
-app = FastAPI()
+app = FastAPI(title="Simple Voice Agent")
+twilio_agent = TwilioVoiceAgent()
 
 
-def parse_positive_int(value: str, default: int) -> int:
-    try:
-        parsed = int(value)
-        return parsed if parsed > 0 else default
-    except (TypeError, ValueError):
-        return default
-
-
-DEFAULT_GATHER_LANGUAGE = os.getenv("TWILIO_GATHER_LANGUAGE", "en-IN")
-DEFAULT_GATHER_SPEECH_MODEL = os.getenv("TWILIO_GATHER_SPEECH_MODEL", "googlev2_telephony")
-DEFAULT_GATHER_TIMEOUT = parse_positive_int(os.getenv("TWILIO_GATHER_TIMEOUT", "8"), 8)
-DEFAULT_GATHER_SPEECH_TIMEOUT = os.getenv("TWILIO_GATHER_SPEECH_TIMEOUT", "3")
-DEFAULT_GATHER_HINTS = os.getenv("TWILIO_GATHER_HINTS", "").strip()
-DEFAULT_TTS_VOICE = os.getenv("TWILIO_TTS_VOICE", "Polly.Joanna-Neural").strip()
-DEFAULT_TTS_LANGUAGE = os.getenv("TWILIO_TTS_LANGUAGE", "").strip()
-
-
-def extract_speech_result(body: bytes) -> str | None:
-    if not body:
-        return None
-
-    parsed = parse_qs(body.decode("utf-8"), keep_blank_values=True)
-    speech_values = parsed.get("SpeechResult")
-
-    return speech_values[0] if speech_values else None
-
-
-def parse_speech_timeout(value: str) -> int:
-    """
-    Twilio only allows positive integers for speechTimeout when speechModel is set.
-    """
-    return parse_positive_int(value, 3)
-
-
-def say_with_config(target: Gather | VoiceResponse, text: str) -> None:
-    say_kwargs = {}
-    if DEFAULT_TTS_VOICE:
-        say_kwargs["voice"] = DEFAULT_TTS_VOICE
-    if DEFAULT_TTS_LANGUAGE:
-        say_kwargs["language"] = DEFAULT_TTS_LANGUAGE
-
-    print(
-        "[DEBUG][TTS] "
-        f"voice={say_kwargs.get('voice', 'default')} "
-        f"language={say_kwargs.get('language', 'default')}"
+@app.get("/health")
+async def health():
+    return JSONResponse(
+        {
+            "status": "ok",
+            "voice_backend": get_voice_backend(),
+        }
     )
-
-    target.say(text, **say_kwargs)
-
-
-def build_gather(prompt: str) -> Gather:
-    gather_kwargs = {
-        "input": "speech",
-        "action": "/voice",
-        "speechTimeout": parse_speech_timeout(DEFAULT_GATHER_SPEECH_TIMEOUT),
-        "timeout": DEFAULT_GATHER_TIMEOUT,
-        "language": DEFAULT_GATHER_LANGUAGE,
-        "speechModel": DEFAULT_GATHER_SPEECH_MODEL,
-    }
-
-    if DEFAULT_GATHER_HINTS:
-        gather_kwargs["hints"] = DEFAULT_GATHER_HINTS
-
-    print(
-        "[DEBUG][STT] "
-        f"speechModel={gather_kwargs['speechModel']} "
-        f"language={gather_kwargs['language']} "
-        f"speechTimeout={gather_kwargs['speechTimeout']} "
-        f"timeout={gather_kwargs['timeout']} "
-        f"hints={'set' if 'hints' in gather_kwargs else 'none'}"
-    )
-
-    gather = Gather(**gather_kwargs)
-    say_with_config(gather, prompt)
-    return gather
 
 
 @app.api_route("/voice", methods=["GET", "POST"])
 async def voice(request: Request):
+    active_backend = get_voice_backend()
+    if active_backend != twilio_agent.backend_name:
+        return twilio_agent.backend_disabled_response(active_backend)
+    return await twilio_agent.handle_voice_request(request)
 
-    if request.method == "POST":
-        body = await request.body()
-        user_speech = extract_speech_result(body)
-    else:
-        user_speech = request.query_params.get("SpeechResult")
 
-    response = VoiceResponse()
+def run_twilio_webhook_server() -> None:
+    host = os.getenv("APP_HOST", "0.0.0.0").strip() or "0.0.0.0"
+    port = parse_positive_int(os.getenv("APP_PORT", "8000"), 8000)
+    uvicorn.run("app.main:app", host=host, port=port)
 
-    # First interaction (no speech yet)
-    if not user_speech:
 
-        gather = build_gather(
-            "Hello. You have reached Wise support. How can I help you today?"
-        )
+def run_selected_backend() -> None:
+    backend = get_voice_backend()
+    if backend == "livekit":
+        # With no explicit subcommand, run a default worker so this works:
+        # VOICE_BACKEND=livekit uv run python -m app.main
+        if len(sys.argv) <= 1:
+            devmode = parse_bool(get_env_str("LIVEKIT_DEVMODE", "true"), True)
+            print(
+                "[BOOT] Starting LiveKit backend "
+                f"(mode={'dev' if devmode else 'prod'}). "
+                "Set LIVEKIT_DEVMODE=false for quieter production mode.",
+                flush=True,
+            )
+            print("[BOOT] Loading LiveKit runtime dependencies...", flush=True)
+            from app.livekit_agent import run_livekit_server
 
-        response.append(gather)
+            run_livekit_server(devmode=devmode)
+            return
 
-        return Response(
-            content=str(response),
-            media_type="application/xml"
-        )
+        print("[BOOT] Starting LiveKit backend via CLI mode.", flush=True)
+        from app.livekit_agent import run_livekit_cli
 
-    print("User said:", user_speech)
+        run_livekit_cli()
+        return
 
-    # RAG retrieval
-    faq = query_faq(user_speech)
+    print("[BOOT] Starting Twilio webhook backend on FastAPI/Uvicorn.", flush=True)
+    run_twilio_webhook_server()
 
-    # Escalation if no match
-    if faq is None:
 
-        say_with_config(
-            response,
-            "I'm sorry, this question requires a human support agent. Please contact Wise support."
-        )
-
-        response.hangup()
-
-        return Response(
-            content=str(response),
-            media_type="application/xml"
-        )
-
-    # Generate answer with Gemini
-    answer = generate_answer(
-        user_speech,
-        faq["content"]
-    )
-
-    # LLM escalation
-    if "HUMAN_ESCALATION" in answer:
-
-        say_with_config(
-            response,
-            "I'm sorry, this question requires a human support agent. Please contact Wise support."
-        )
-
-        response.hangup()
-
-        return Response(
-            content=str(response),
-            media_type="application/xml"
-        )
-
-    # Speak the answer
-    gather = build_gather(answer)
-
-    response.append(gather)
-
-    return Response(
-        content=str(response),
-        media_type="application/xml"
-    )
+if __name__ == "__main__":
+    run_selected_backend()

@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 
 from fastembed import TextEmbedding
 from qdrant_client import QdrantClient
@@ -8,13 +9,18 @@ COLLECTION_NAME = "wise_faq"
 # similarity threshold for FAQ match
 SIMILARITY_THRESHOLD = 0.65
 
-# Initialize embedding model
-embedding_model = TextEmbedding()
-
-# Connect to Qdrant
 qdrant_host = os.getenv("QDRANT_HOST", "localhost")
 qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-client = QdrantClient(host=qdrant_host, port=qdrant_port)
+
+
+@lru_cache(maxsize=1)
+def get_embedding_model() -> TextEmbedding:
+    return TextEmbedding()
+
+
+@lru_cache(maxsize=1)
+def get_qdrant_client() -> QdrantClient:
+    return QdrantClient(host=qdrant_host, port=qdrant_port)
 
 
 def query_faq(user_question: str):
@@ -23,6 +29,9 @@ def query_faq(user_question: str):
     """
 
     try:
+        embedding_model = get_embedding_model()
+        client = get_qdrant_client()
+
         # Generate embedding for user query
         query_vector = list(embedding_model.embed([user_question]))[0]
 
