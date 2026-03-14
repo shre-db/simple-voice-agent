@@ -124,7 +124,7 @@ Single entrypoint:
 - `uv run python -m app.main` starts LiveKit worker mode in quieter non-CLI mode when `VOICE_BACKEND=livekit`.
 - Optional: set `LIVEKIT_DEVMODE=false` to run quieter LiveKit production mode when no CLI subcommand is passed.
 
-## Quick Start (Docker)
+## Quick Start: Twilio Backend (Docker)
 Run the setup script:
 ```bash
 ./scripts/setup.sh
@@ -138,7 +138,15 @@ What it does:
 
 This path is for `VOICE_BACKEND=twilio`.
 
-## LiveKit Quick Start
+Run commands summary:
+- Twilio backend:
+  - `VOICE_BACKEND=twilio uv run python -m app.main` (or Docker `./scripts/setup.sh`)
+- LiveKit backend (recommended local):
+  - `VOICE_BACKEND=livekit uv run python -m app.main dev`
+- LiveKit backend (quieter non-CLI):
+  - `VOICE_BACKEND=livekit uv run python -m app.main`
+
+## Quick Start: LiveKit Backend
 
 1. Set `VOICE_BACKEND=livekit` and add LiveKit Cloud credentials in `.env`.
 2. Ensure Qdrant has FAQ data (run `./scripts/setup.sh` once or ingest manually).

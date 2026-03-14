@@ -42,17 +42,26 @@ def run_selected_backend() -> None:
         # With no explicit subcommand, run a default worker so this works:
         # VOICE_BACKEND=livekit uv run python -m app.main
         if len(sys.argv) <= 1:
+            devmode = parse_bool(get_env_str("LIVEKIT_DEVMODE", "true"), True)
+            print(
+                "[BOOT] Starting LiveKit backend "
+                f"(mode={'dev' if devmode else 'prod'}). "
+                "Set LIVEKIT_DEVMODE=false for quieter production mode.",
+                flush=True,
+            )
+            print("[BOOT] Loading LiveKit runtime dependencies...", flush=True)
             from app.livekit_agent import run_livekit_server
 
-            devmode = parse_bool(get_env_str("LIVEKIT_DEVMODE", "false"), False)
             run_livekit_server(devmode=devmode)
             return
 
+        print("[BOOT] Starting LiveKit backend via CLI mode.", flush=True)
         from app.livekit_agent import run_livekit_cli
 
         run_livekit_cli()
         return
 
+    print("[BOOT] Starting Twilio webhook backend on FastAPI/Uvicorn.", flush=True)
     run_twilio_webhook_server()
 
 

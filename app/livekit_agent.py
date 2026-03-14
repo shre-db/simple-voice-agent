@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 from app.base_agent import BaseVoiceAgent
@@ -132,36 +134,10 @@ class LiveKitVoiceAgent(BaseVoiceAgent):
             return inference.TTS(model=self.tts_model, voice=self.tts_voice)
         return inference.TTS(model=self.tts_model)
 
-    def prewarm(self, proc: JobProcessT) -> None:
-        proc.userdata["vad"] = silero.VAD.load()
-
     def build_server(self):
         _require_livekit_dependencies()
-        agent_owner = self
-        server = AgentServer(setup_fnc=self.prewarm)
-
-        @server.rtc_session(agent_name=self.agent_name)
-        async def entrypoint(ctx: JobContextT):
-            await ctx.connect()
-            session = AgentSession(
-                stt=inference.STT(model=agent_owner.stt_model, language=agent_owner.stt_language),
-                tts=agent_owner.build_tts(),
-                vad=ctx.proc.userdata["vad"],
-                allow_interruptions=agent_owner.allow_interruptions,
-                min_interruption_duration=agent_owner.min_interruption_duration,
-                min_endpointing_delay=agent_owner.min_endpointing_delay,
-                max_endpointing_delay=agent_owner.max_endpointing_delay,
-            )
-
-            await session.start(
-                room=ctx.room,
-                agent=_LiveKitRuntimeAgent(agent_owner),
-                room_output_options=RoomOutputOptions(
-                    transcription_enabled=False,
-                    sync_transcription=False,
-                ),
-            )
-
+        server = AgentServer(setup_fnc=_livekit_prewarm)
+        server.rtc_session(agent_name=self.agent_name)(_livekit_entrypoint)
         return server
 
     def run_cli(self) -> None:
@@ -219,6 +195,36 @@ class _LiveKitRuntimeAgent(Agent):
         await say_and_wait(self.session, support_response.text)
 
 
+def _livekit_prewarm(proc: JobProcessT) -> None:
+    _require_livekit_dependencies()
+    proc.userdata["vad"] = silero.VAD.load()
+
+
+async def _livekit_entrypoint(ctx: JobContextT) -> None:
+    _require_livekit_dependencies()
+    owner = LiveKitVoiceAgent()
+
+    await ctx.connect()
+    session = AgentSession(
+        stt=inference.STT(model=owner.stt_model, language=owner.stt_language),
+        tts=owner.build_tts(),
+        vad=ctx.proc.userdata["vad"],
+        allow_interruptions=owner.allow_interruptions,
+        min_interruption_duration=owner.min_interruption_duration,
+        min_endpointing_delay=owner.min_endpointing_delay,
+        max_endpointing_delay=owner.max_endpointing_delay,
+    )
+
+    await session.start(
+        room=ctx.room,
+        agent=_LiveKitRuntimeAgent(owner),
+        room_output_options=RoomOutputOptions(
+            transcription_enabled=False,
+            sync_transcription=False,
+        ),
+    )
+
+
 def run_livekit_cli() -> None:
     LiveKitVoiceAgent().run_cli()
 
@@ -227,7 +233,9 @@ def run_livekit_server(devmode: bool = False) -> None:
     agent = LiveKitVoiceAgent()
     _require_livekit_dependencies()
     server = agent.build_server()
-    server.run(devmode=devmode)
+    run_result = server.run(devmode=devmode)
+    if inspect.isawaitable(run_result):
+        asyncio.run(run_result)
 
 
 if __name__ == "__main__":
