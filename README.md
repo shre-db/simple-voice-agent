@@ -19,6 +19,17 @@ The agent:
 
 - [System architecture and technical details](docs/architecture.md)
 
+## App Layout
+
+- `app/main.py` - shared entrypoint; switches backend using `VOICE_BACKEND`
+- `app/rag.py` - FAQ retrieval from Qdrant/FastEmbed
+- `app/llm.py` - Gemini setup, system prompt, retry/fallback handling
+- `app/base_agent.py` - abstract base class and shared support decision flow
+- `app/mixins.py` - identity and logging mixins
+- `app/twilio_agent.py` - Twilio implementation (webhook/TwiML flow)
+- `app/livekit_agent.py` - LiveKit implementation (worker/session flow)
+- `app/utils.py` - shared helpers/utilities for both backends
+
 ## Stack
 
 - FastAPI (voice webhook)
@@ -71,6 +82,7 @@ Optional (defaults shown):
 - `GOOGLE_MODEL_RETRY_BACKOFF_SECONDS=0.6`
 - `LIVEKIT_AGENT_NAME=wise-support-agent`
 - `LIVEKIT_ROOM_PREFIX=call-`
+- `LIVEKIT_DEVMODE=true`
 - `LIVEKIT_STT_MODEL=deepgram/nova-2-phonecall`
 - `LIVEKIT_STT_LANGUAGE=en`
 - `LIVEKIT_TTS_MODEL=cartesia/sonic-3`
@@ -106,7 +118,13 @@ VOICE_BACKEND=twilio   # or livekit
 - `twilio`: run FastAPI webhook (`/voice`) and point Twilio phone number to it.
 - `livekit`: run LiveKit agent worker and assign a LiveKit phone number to the agent.
 
-## Quick Start (Docker)
+Single entrypoint:
+- `uv run python -m app.main` starts Twilio webhook mode when `VOICE_BACKEND=twilio`.
+- `uv run python -m app.main dev` is the recommended local command for LiveKit (`VOICE_BACKEND=livekit`) because it provides worker/watch logs.
+- `uv run python -m app.main` starts LiveKit worker mode in quieter non-CLI mode when `VOICE_BACKEND=livekit`.
+- Optional: set `LIVEKIT_DEVMODE=false` to run quieter LiveKit production mode when no CLI subcommand is passed.
+
+## Quick Start: Twilio Backend (Docker)
 Run the setup script:
 ```bash
 ./scripts/setup.sh
@@ -120,7 +138,15 @@ What it does:
 
 This path is for `VOICE_BACKEND=twilio`.
 
-## LiveKit Quick Start
+Run commands summary:
+- Twilio backend:
+  - `VOICE_BACKEND=twilio uv run python -m app.main` (or Docker `./scripts/setup.sh`)
+- LiveKit backend (recommended local):
+  - `VOICE_BACKEND=livekit uv run python -m app.main dev`
+- LiveKit backend (quieter non-CLI):
+  - `VOICE_BACKEND=livekit uv run python -m app.main`
+
+## Quick Start: LiveKit Backend
 
 1. Set `VOICE_BACKEND=livekit` and add LiveKit Cloud credentials in `.env`.
 2. Ensure Qdrant has FAQ data (run `./scripts/setup.sh` once or ingest manually).
@@ -128,6 +154,7 @@ This path is for `VOICE_BACKEND=twilio`.
 
 ```bash
 ./scripts/run_livekit_agent.sh
+# equivalent: uv run python -m app.main dev
 ```
 
 4. Create a SIP dispatch rule that routes calls to your agent:
