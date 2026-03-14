@@ -119,7 +119,9 @@ VOICE_BACKEND=twilio   # or livekit
 
 Single entrypoint:
 - `uv run python -m app.main` starts Twilio webhook mode when `VOICE_BACKEND=twilio`.
-- `uv run python -m app.main dev` starts LiveKit worker mode when `VOICE_BACKEND=livekit`.
+- `uv run python -m app.main` starts LiveKit worker mode when `VOICE_BACKEND=livekit`.
+- `uv run python -m app.main dev` keeps LiveKit CLI dev mode (hot reload/watcher behavior).
+- Optional: set `LIVEKIT_DEVMODE=true` to run LiveKit default mode with `devmode` when no CLI subcommand is passed.
 
 ## Quick Start (Docker)
 Run the setup script:

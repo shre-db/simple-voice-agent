@@ -1,11 +1,12 @@
 import os
+import sys
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.twilio_agent import TwilioVoiceAgent
-from app.utils import get_voice_backend, parse_positive_int
+from app.utils import get_env_str, get_voice_backend, parse_bool, parse_positive_int
 
 app = FastAPI(title="Simple Voice Agent")
 twilio_agent = TwilioVoiceAgent()
@@ -38,6 +39,15 @@ def run_twilio_webhook_server() -> None:
 def run_selected_backend() -> None:
     backend = get_voice_backend()
     if backend == "livekit":
+        # With no explicit subcommand, run a default worker so this works:
+        # VOICE_BACKEND=livekit uv run python -m app.main
+        if len(sys.argv) <= 1:
+            from app.livekit_agent import run_livekit_server
+
+            devmode = parse_bool(get_env_str("LIVEKIT_DEVMODE", "false"), False)
+            run_livekit_server(devmode=devmode)
+            return
+
         from app.livekit_agent import run_livekit_cli
 
         run_livekit_cli()

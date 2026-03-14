@@ -223,5 +223,12 @@ def run_livekit_cli() -> None:
     LiveKitVoiceAgent().run_cli()
 
 
+def run_livekit_server(devmode: bool = False) -> None:
+    agent = LiveKitVoiceAgent()
+    _require_livekit_dependencies()
+    server = agent.build_server()
+    server.run(devmode=devmode)
+
+
 if __name__ == "__main__":
     run_livekit_cli()
